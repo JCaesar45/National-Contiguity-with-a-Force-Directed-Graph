@@ -1,0 +1,135 @@
+const width = 960;
+const height = 600;
+
+const svg = d3.select("svg").attr("width", width).attr("height", height);
+
+const tooltip = d3.select("#tooltip");
+const infoPanel = d3.select("#info-panel");
+
+// Country code to full name mapping for tooltip and info panel
+const countryNames = {
+  us: "United States",
+  fr: "France",
+  de: "Germany",
+  be: "Belgium",
+  nl: "Netherlands",
+  pl: "Poland"
+};
+
+// Country code to direct SVG flag URLs (CDN)
+const flagURLs = {
+  us: "https://cdn.jsdelivr.net/gh/hjnilsson/country-flags/svg/us.svg",
+  fr: "https://cdn.jsdelivr.net/gh/hjnilsson/country-flags/svg/fr.svg",
+  de: "https://cdn.jsdelivr.net/gh/hjnilsson/country-flags/svg/de.svg",
+  be: "https://cdn.jsdelivr.net/gh/hjnilsson/country-flags/svg/be.svg",
+  nl: "https://cdn.jsdelivr.net/gh/hjnilsson/country-flags/svg/nl.svg",
+  pl: "https://cdn.jsdelivr.net/gh/hjnilsson/country-flags/svg/pl.svg"
+};
+
+// Nodes data (countries by ISO alpha-2 code)
+const nodes = [
+  { code: "de" },
+  { code: "fr" },
+  { code: "be" },
+  { code: "nl" },
+  { code: "pl" },
+  { code: "us" }
+];
+
+// Links data (borders or relations)
+const links = [
+  { source: "de", target: "fr" },
+  { source: "de", target: "be" },
+  { source: "de", target: "pl" },
+  { source: "nl", target: "be" },
+  { source: "fr", target: "be" },
+  { source: "us", target: "nl" }
+];
+
+const simulation = d3
+  .forceSimulation(nodes)
+  .force(
+    "link",
+    d3
+      .forceLink(links)
+      .id((d) => d.code)
+      .distance(120)
+  )
+  .force("charge", d3.forceManyBody().strength(-350))
+  .force("center", d3.forceCenter(width / 2, height / 2));
+
+const link = svg
+  .append("g")
+  .attr("stroke", "#888")
+  .attr("stroke-width", 2)
+  .selectAll("line")
+  .data(links)
+  .enter()
+  .append("line");
+
+const node = svg
+  .append("g")
+  .selectAll("foreignObject")
+  .data(nodes)
+  .enter()
+  .append("foreignObject")
+  .attr("width", 30)
+  .attr("height", 22)
+  .style("cursor", "pointer")
+  .call(
+    d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended)
+  )
+  .on("mouseover", (event, d) => {
+    const label = countryNames[d.code] || d.code.toUpperCase();
+    tooltip.style("display", "block").html(label);
+    infoPanel.html(`<strong>${label}</strong>`);
+  })
+  .on("mousemove", (event) => {
+    tooltip
+      .style("left", event.pageX + 15 + "px")
+      .style("top", event.pageY - 30 + "px");
+  })
+  .on("mouseout", () => {
+    tooltip.style("display", "none");
+    infoPanel.html(
+      "<strong>Hover over a flag</strong><br>See the country name here."
+    );
+  });
+
+// Inject an <img> tag inside each foreignObject for the flag image
+node.html(
+  (d) => `
+  <img class="flag-img" src="${flagURLs[d.code]}" alt="${
+    countryNames[d.code] || d.code
+  }" />
+`
+);
+
+simulation.on("tick", () => {
+  link
+    .attr("x1", (d) => d.source.x)
+    .attr("y1", (d) => d.source.y)
+    .attr("x2", (d) => d.target.x)
+    .attr("y2", (d) => d.target.y);
+
+  node
+    .attr("x", (d) => d.x - 15) // center horizontally
+    .attr("y", (d) => d.y - 11); // center vertically
+});
+
+function dragstarted(event, d) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragged(event, d) {
+  d.fx = event.x;
+  d.fy = event.y;
+}
+
+function dragended(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
